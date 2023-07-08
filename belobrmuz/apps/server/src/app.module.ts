@@ -20,6 +20,7 @@ import { ScheduledTasksModule } from './modules/scheduled-tasks/scheduled-tasks.
       database: process.env.POSTGRES_DB,
       entities: [User, EmailConfirmation],
       synchronize: true,
+      logging: false,
     }),
     UserModule,
     AuthModule,

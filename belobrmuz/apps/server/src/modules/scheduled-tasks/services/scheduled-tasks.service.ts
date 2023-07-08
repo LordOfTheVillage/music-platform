@@ -6,10 +6,9 @@ import { UserService } from '../../user/services/user.service';
 export class ScheduledTasksService {
   constructor(private readonly userService: UserService) {}
 
-  @Cron('*/10 * * * * *')
+  @Cron('0 0 * * *')
   async clearUnverifiedUsers() {
     const unverifiedUsers = await this.userService.findUnverified();
-    console.log('Clearing unverified users', unverifiedUsers);
     await Promise.all(
       unverifiedUsers.map((user) => this.userService.remove(user.id))
     );
