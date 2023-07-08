@@ -1,18 +1,34 @@
-import { Entity, Column, PrimaryGeneratedColumn } from "typeorm"
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  OneToOne,
+  JoinColumn,
+} from 'typeorm';
+import { EmailConfirmation } from './email-confirmation.model';
 
-@Entity("users")
+@Entity('users')
 export class User {
   @PrimaryGeneratedColumn()
-  id: number
+  id: number;
 
   @Column()
-  username: string
+  username: string;
+
+  @Column({
+    unique: true,
+  })
+  email: string;
 
   @Column()
-  password: string
+  password: string;
 
   @Column({
     nullable: true,
   })
   refreshToken: string;
+
+  @OneToOne(() => EmailConfirmation)
+  @JoinColumn()
+  emailConfirmation: EmailConfirmation;
 }

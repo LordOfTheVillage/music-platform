@@ -5,13 +5,12 @@ import { AuthDto } from '../dto/auth.dto';
 import { Request } from 'express';
 import { RefreshTokenGuard } from '../../../common/guards/refresh-token.guard';
 
-@Controller("auth")
+@Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
   signup(@Body() createUserDto: CreateUserDto) {
-    console.log(createUserDto)
     return this.authService.signUp(createUserDto);
   }
 

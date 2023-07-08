@@ -1,46 +1,64 @@
-import * as bcrypt from 'bcryptjs';
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { UserService } from '../../user/services/user.service';
 import { CreateUserDto } from '../../user/dto/create-user.dto';
 import { AuthDto } from '../dto/auth.dto';
-import * as process from 'process';
 import { ExceptionAuthMessages } from '../constants/exception-messages';
+import { TokenService } from './token.service';
+import { JwtPayload, JwtTokens } from '../../../common/types/jwt.type';
+import { User } from '../../user/models/user.model';
+import { MailService } from '../../mail/services/mail.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private userService: UserService,
-    private jwtService: JwtService,
+    private tokenService: TokenService,
+    private mailService: MailService
   ) {}
 
-  async signUp(createUserDto: CreateUserDto): Promise<any> {
+  async signUp(createUserDto: CreateUserDto) {
     const userExists = await this.userService.findByUsername(
-      createUserDto.username,
+      createUserDto.username
     );
     if (userExists) {
       throw new BadRequestException(ExceptionAuthMessages.USER_ALREADY_EXISTS);
     }
 
-    const hash = await this.hashData(createUserDto.password);
-    const newUser = await this.userService.create({
-      ...createUserDto,
-      password: hash,
+    const token = await this.tokenService.getVerificationToken({
+      email: createUserDto.email,
     });
-    const tokens = await this.getTokens(newUser.id, newUser.username);
-    await this.updateRefreshToken(newUser.id, tokens.refreshToken);
-    return tokens;
+
+    const hash = await this.tokenService.hashData(createUserDto.password);
+    const newUser = await this.userService.create(
+      {
+        ...createUserDto,
+        password: hash,
+      },
+      token
+    );
+
+    await this.sendVerificationEmail(newUser, token);
   }
 
   async signIn(data: AuthDto) {
-    const user = await this.userService.findByUsername(data.username);
-    if (!user) throw new BadRequestException(ExceptionAuthMessages.USER_NOT_FOUND);
+    const user = await this.userService.findByEmail(data.email);
+    if (!user)
+      throw new BadRequestException(ExceptionAuthMessages.USER_NOT_FOUND);
 
-    const passwordMatches = await bcrypt.compare(data.password, user.password);
+    const passwordMatches = await this.tokenService.matchHash(
+      data.password,
+      user.password
+    );
     if (!passwordMatches)
       throw new BadRequestException(ExceptionAuthMessages.WRONG_PASSWORD);
 
-    const tokens = await this.getTokens(user.id, user.username);
+    const tokens = await this.tokenService.getTokens(
+      this.generateUserTokenData(user)
+    );
     await this.updateRefreshToken(user.id, tokens.refreshToken);
     return tokens;
   }
@@ -54,56 +72,51 @@ export class AuthService {
     if (!user || !user.refreshToken)
       throw new ForbiddenException(ExceptionAuthMessages.ACCESS_DENIED);
 
-    const refreshTokenMatches = await bcrypt.compare(
+    const refreshTokenMatches = await this.tokenService.matchHash(
       refreshToken,
-      user.refreshToken,
+      user.refreshToken
     );
-    if (!refreshTokenMatches) throw new ForbiddenException(ExceptionAuthMessages.ACCESS_DENIED);
+    if (!refreshTokenMatches)
+      throw new ForbiddenException(ExceptionAuthMessages.ACCESS_DENIED);
 
-    const tokens = await this.getTokens(user.id, user.username);
+    const tokens = await this.tokenService.getTokens(
+      this.generateUserTokenData(user)
+    );
     await this.updateRefreshToken(user.id, tokens.refreshToken);
     return tokens;
   }
 
-  hashData(data: string) {
-    const rounds = 10
-    return bcrypt.hash(data, rounds);
-  }
-
   async updateRefreshToken(userId: number, refreshToken: string) {
-    const hashedRefreshToken = await this.hashData(refreshToken);
+    const hashedRefreshToken = await this.tokenService.hashData(refreshToken);
     await this.userService.update(userId, {
       refreshToken: hashedRefreshToken,
     });
   }
 
-  async getTokens(userId: number, username: string) {
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(
-        {
-          sub: userId,
-          username,
-        },
-        {
-          secret: process.env.ACCESS_SECRET,
-          expiresIn: process.env.ACCESS_EXPIRES_IN,
-        },
-      ),
-      this.jwtService.signAsync(
-        {
-          sub: userId,
-          username,
-        },
-        {
-          secret: process.env.REFRESH_SECRET,
-          expiresIn: process.env.REFRESH_EXPIRES_IN,
-        },
-      ),
-    ]);
+  async sendVerificationEmail(user: User, token: string) {
+    const url = `${process.env.EMAIL_URL}/auth/verify/${token}`;
+    await this.mailService.sendConfirmationMail(user, token, url);
+  }
 
+  async verifyUser(token: string): Promise<JwtTokens> {
+    const user = await this.userService.findByVerificationToken(token);
+    if (!user)
+      throw new BadRequestException(ExceptionAuthMessages.USER_NOT_FOUND);
+
+    await this.userService.updateConfirmationStatus(user, true);
+
+    const tokens = await this.tokenService.getTokens(
+      this.generateUserTokenData(user)
+    );
+    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    return tokens;
+  }
+
+  generateUserTokenData(user: User): JwtPayload {
     return {
-      accessToken,
-      refreshToken,
+      sub: `${user.id}`,
+      username: user.username,
+      email: user.email,
     };
   }
 }

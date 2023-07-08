@@ -4,6 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './modules/user/models/user.model';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
+import { MailModule } from './modules/mail/mail.module';
+import { EmailConfirmation } from './modules/user/models/email-confirmation.model';
+import { ScheduledTasksModule } from './modules/scheduled-tasks/scheduled-tasks.module';
 
 @Module({
   imports: [
@@ -15,11 +18,14 @@ import { AuthModule } from './modules/auth/auth.module';
       username: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       database: process.env.POSTGRES_DB,
-      entities: [User],
+      entities: [User, EmailConfirmation],
       synchronize: true,
     }),
     UserModule,
     AuthModule,
-  ]
+    MailModule,
+    ScheduledTasksModule,
+  ],
+  providers: [],
 })
 export class AppModule {}
