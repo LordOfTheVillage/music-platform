@@ -8,6 +8,7 @@ import { AuthService } from './services/auth.service';
 import { TokenService } from './services/token.service';
 import { MailModule } from '../mail/mail.module';
 import { VerificationController } from './controllers/verification.controller';
+import { ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [JwtModule.register({}), UserModule, MailModule],
@@ -17,6 +18,8 @@ import { VerificationController } from './controllers/verification.controller';
     AccessTokenStrategy,
     RefreshTokenStrategy,
     TokenService,
-  ],
+    ConfigService
+  ]
 })
-export class AuthModule {}
+export class AuthModule {
+}

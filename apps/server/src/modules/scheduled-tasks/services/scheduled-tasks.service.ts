@@ -4,7 +4,8 @@ import { UserService } from '../../user/services/user.service';
 
 @Injectable()
 export class ScheduledTasksService {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) {
+  }
 
   @Cron('0 0 * * *')
   async clearUnverifiedUsers() {

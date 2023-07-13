@@ -3,7 +3,8 @@ import { AuthService } from '../services/auth.service';
 
 @Controller('auth')
 export class VerificationController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {
+  }
 
   @Get('verify/:token')
   verify(@Param('token') token: string) {

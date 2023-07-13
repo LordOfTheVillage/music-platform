@@ -5,6 +5,7 @@ import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [ScheduleModule.forRoot(), UserModule],
-  providers: [ScheduledTasksService],
+  providers: [ScheduledTasksService]
 })
-export class ScheduledTasksModule {}
+export class ScheduledTasksModule {
+}

@@ -1,39 +1,43 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import process from 'process';
 import * as bcrypt from 'bcryptjs';
+import { ConfigService } from '@nestjs/config';
 
 type EncryptedData = Record<string, string | number>;
 
 @Injectable()
 export class TokenService {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService
+  ) {
+  }
 
   async getTokens(encryptedData: EncryptedData) {
     const [accessToken, refreshToken] = await Promise.all([
       this.generateToken(
         encryptedData,
-        process.env.ACCESS_SECRET,
-        process.env.ACCESS_EXPIRES_IN
+        this.configService.getOrThrow('ACCESS_SECRET'),
+        this.configService.getOrThrow('ACCESS_EXPIRES_IN')
       ),
       this.generateToken(
         encryptedData,
-        process.env.REFRESH_SECRET,
-        process.env.REFRESH_EXPIRES_IN
-      ),
+        this.configService.getOrThrow('REFRESH_SECRET'),
+        this.configService.getOrThrow('REFRESH_EXPIRES_IN')
+      )
     ]);
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken
     };
   }
 
   getVerificationToken(encryptedData: EncryptedData) {
     return this.generateToken(
       encryptedData,
-      process.env.VERIFICATION_SECRET,
-      process.env.VERIFICATION_EXPIRES_IN
+      this.configService.getOrThrow('VERIFICATION_SECRET'),
+      this.configService.getOrThrow('VERIFICATION_EXPIRES_IN')
     );
   }
 
@@ -46,7 +50,7 @@ export class TokenService {
       { ...encryptedData },
       {
         secret,
-        expiresIn,
+        expiresIn
       }
     );
   }

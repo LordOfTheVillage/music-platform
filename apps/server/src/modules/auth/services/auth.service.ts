@@ -1,7 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
-  Injectable,
+  Injectable
 } from '@nestjs/common';
 import { UserService } from '../../user/services/user.service';
 import { CreateUserDto } from '../../user/dto/create-user.dto';
@@ -11,14 +11,17 @@ import { TokenService } from './token.service';
 import { JwtPayload, JwtTokens } from '../../../common/types/jwt.type';
 import { User } from '../../user/models/user.model';
 import { MailService } from '../../mail/services/mail.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private userService: UserService,
-    private tokenService: TokenService,
-    private mailService: MailService
-  ) {}
+    private readonly userService: UserService,
+    private readonly tokenService: TokenService,
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService
+  ) {
+  }
 
   async signUp(createUserDto: CreateUserDto) {
     const userExists = await this.userService.findByUsername(
@@ -29,14 +32,14 @@ export class AuthService {
     }
 
     const token = await this.tokenService.getVerificationToken({
-      email: createUserDto.email,
+      email: createUserDto.email
     });
 
     const hash = await this.tokenService.hashData(createUserDto.password);
     const newUser = await this.userService.create(
       {
         ...createUserDto,
-        password: hash,
+        password: hash
       },
       token
     );
@@ -89,12 +92,12 @@ export class AuthService {
   async updateRefreshToken(userId: number, refreshToken: string) {
     const hashedRefreshToken = await this.tokenService.hashData(refreshToken);
     await this.userService.update(userId, {
-      refreshToken: hashedRefreshToken,
+      refreshToken: hashedRefreshToken
     });
   }
 
   async sendVerificationEmail(user: User, token: string) {
-    const url = `${process.env.EMAIL_URL}/auth/verify/${token}`;
+    const url = `${this.configService.getOrThrow('EMAIL_URL')}/auth/verify/${token}`;
     await this.mailService.sendConfirmationMail(user, token, url);
   }
 
@@ -116,7 +119,7 @@ export class AuthService {
     return {
       sub: `${user.id}`,
       username: user.username,
-      email: user.email,
+      email: user.email
     };
   }
 }

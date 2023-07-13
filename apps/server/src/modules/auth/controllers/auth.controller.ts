@@ -7,7 +7,8 @@ import { RefreshTokenGuard } from '../../../common/guards/refresh-token.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {
+  }
 
   @Post('register')
   signup(@Body() createUserDto: CreateUserDto) {
