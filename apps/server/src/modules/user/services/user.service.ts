@@ -9,10 +9,10 @@ import { DataSource, Repository } from 'typeorm';
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(User) private userRepository: Repository<User>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(EmailConfirmation)
-    private emailConfirmationRepository: Repository<EmailConfirmation>,
-    private dataSource: DataSource
+    private readonly emailConfirmationRepository: Repository<EmailConfirmation>,
+    private readonly dataSource: DataSource
   ) {}
 
   async create(createUserDto: CreateUserDto, confirmationToken: string) {
