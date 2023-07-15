@@ -4,15 +4,14 @@ import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmailConfirmation } from '../models/email-confirmation.model';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(EmailConfirmation)
-    private readonly emailConfirmationRepository: Repository<EmailConfirmation>,
-    private readonly dataSource: DataSource
+    private readonly emailConfirmationRepository: Repository<EmailConfirmation>
   ) {}
 
   async create(createUserDto: CreateUserDto, confirmationToken: string) {
@@ -69,10 +68,17 @@ export class UserService {
     return this.userRepository.update(id, updateUserDto);
   }
 
-  async updateConfirmationStatus(user: User, isConfirmed: boolean) {
-    user.emailConfirmation.isConfirmed = isConfirmed;
-    user.emailConfirmation.confirmationToken = null;
-    await this.emailConfirmationRepository.save(user.emailConfirmation);
+  async updateConfirmationStatus(userId: number, isConfirmed: boolean) {
+    const emailConfirmation = await this.emailConfirmationRepository.findOne({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+    });
+    emailConfirmation.isConfirmed = isConfirmed;
+    emailConfirmation.confirmationToken = null;
+    await this.emailConfirmationRepository.save(emailConfirmation);
   }
 
   async remove(id: number) {

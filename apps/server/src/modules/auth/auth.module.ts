@@ -9,17 +9,22 @@ import { TokenService } from './services/token.service';
 import { MailModule } from '../mail/mail.module';
 import { VerificationController } from './controllers/verification.controller';
 import { ConfigService } from '@nestjs/config';
+import { RefreshSessionModule } from '../refresh-session/refresh-session.module';
 
 @Module({
-  imports: [JwtModule.register({}), UserModule, MailModule],
+  imports: [
+    JwtModule.register({}),
+    UserModule,
+    MailModule,
+    RefreshSessionModule,
+  ],
   controllers: [AuthController, VerificationController],
   providers: [
     AuthService,
     AccessTokenStrategy,
     RefreshTokenStrategy,
     TokenService,
-    ConfigService
-  ]
+    ConfigService,
+  ],
 })
-export class AuthModule {
-}
+export class AuthModule {}

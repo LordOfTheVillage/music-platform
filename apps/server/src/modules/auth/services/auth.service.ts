@@ -12,23 +12,26 @@ import { JwtPayload, JwtTokens } from '../../../common/types/jwt.type';
 import { User } from '../../user/models/user.model';
 import { MailService } from '../../mail/services/mail.service';
 import { ConfigService } from '@nestjs/config';
+import { RefreshSessionService } from '../../refresh-session/services/refresh-session.service';
 
 @Injectable()
 export class AuthService {
+  private readonly verificationUrl = `auth/verify/`;
+
   constructor(
     private readonly userService: UserService,
     private readonly tokenService: TokenService,
     private readonly mailService: MailService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly refreshSessionService: RefreshSessionService
   ) {}
 
   async signUp(createUserDto: CreateUserDto) {
     const userExists = await this.userService.findByUsername(
       createUserDto.username
     );
-    if (userExists) {
+    if (userExists)
       throw new BadRequestException(exceptionAuthMessages.USER_ALREADY_EXISTS);
-    }
 
     const token = await this.tokenService.getVerificationToken({
       email: createUserDto.email,
@@ -46,7 +49,19 @@ export class AuthService {
     await this.sendVerificationEmail(newUser, token);
   }
 
-  async signIn(data: AuthDto) {
+  async signIn(data: AuthDto, fingerprint: string) {
+    if (!fingerprint)
+      throw new BadRequestException(exceptionAuthMessages.NO_FINGERPRINT);
+
+    const session =
+      await this.refreshSessionService.findRefreshSessionByFingerprint(
+        fingerprint
+      );
+    if (session)
+      await this.refreshSessionService.removeRefreshSession(
+        session.refreshToken
+      );
+
     const user = await this.userService.findByEmail(data.email);
     if (!user)
       throw new BadRequestException(exceptionAuthMessages.USER_NOT_FOUND);
@@ -61,58 +76,90 @@ export class AuthService {
     const tokens = await this.tokenService.getTokens(
       this.generateUserTokenData(user)
     );
-    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    await this.refreshSessionService.createRefreshSession({
+      refreshToken: tokens.refreshToken,
+      userId: user.id,
+      fingerprint,
+    });
     return tokens;
   }
 
-  async logout(userId: number) {
-    return this.userService.update(userId, { refreshToken: null });
+  async logout(id: number, refreshToken: string, fingerprint: string) {
+    const refreshSession = await this.refreshSessionService.findRefreshSession(
+      refreshToken
+    );
+
+    if (refreshSession.fingerprint !== fingerprint)
+      throw new ForbiddenException(
+        exceptionAuthMessages.INVALID_REFRESH_SESSION
+      );
+
+    if (!refreshSession)
+      throw new ForbiddenException(exceptionAuthMessages.ACCESS_DENIED);
+
+    await this.refreshSessionService.removeRefreshSession(refreshToken);
   }
 
-  async refreshTokens(id: number, refreshToken: string) {
+  async refreshTokens(id: number, refreshToken: string, fingerprint: string) {
     const user = await this.userService.findById(id);
-    if (!user || !user.refreshToken)
+    if (!user)
       throw new ForbiddenException(exceptionAuthMessages.ACCESS_DENIED);
 
-    const refreshTokenMatches = await this.tokenService.matchHash(
-      refreshToken,
-      user.refreshToken
+    const refreshSession = await this.refreshSessionService.findRefreshSession(
+      refreshToken
     );
-    if (!refreshTokenMatches)
+
+    if (!refreshSession)
       throw new ForbiddenException(exceptionAuthMessages.ACCESS_DENIED);
+
+    await this.refreshSessionService.removeRefreshSession(refreshToken);
+
+    if (
+      Number(refreshSession.userId) !== user.id ||
+      refreshSession.fingerprint !== fingerprint
+    )
+      throw new ForbiddenException(
+        exceptionAuthMessages.INVALID_REFRESH_SESSION
+      );
 
     const tokens = await this.tokenService.getTokens(
       this.generateUserTokenData(user)
     );
-    await this.updateRefreshToken(user.id, tokens.refreshToken);
+
+    await this.refreshSessionService.createRefreshSession({
+      ...refreshSession,
+      refreshToken: tokens.refreshToken,
+    });
+
     return tokens;
   }
 
-  async updateRefreshToken(userId: number, refreshToken: string) {
-    const hashedRefreshToken = await this.tokenService.hashData(refreshToken);
-    await this.userService.update(userId, {
-      refreshToken: hashedRefreshToken,
-    });
-  }
-
   async sendVerificationEmail(user: User, token: string) {
-    const url = `${this.configService.getOrThrow(
-      'EMAIL_URL'
-    )}/auth/verify/${token}`;
+    const url = `${this.configService.getOrThrow('EMAIL_URL')}${
+      this.verificationUrl
+    }${token}`;
     await this.mailService.sendConfirmationMail(user, token, url);
   }
 
-  async verifyUser(token: string): Promise<JwtTokens> {
+  async verifyUser(token: string, fingerprint: string): Promise<JwtTokens> {
+    if (!fingerprint)
+      throw new BadRequestException(exceptionAuthMessages.NO_FINGERPRINT);
+
     const user = await this.userService.findByVerificationToken(token);
     if (!user)
       throw new BadRequestException(exceptionAuthMessages.USER_NOT_FOUND);
 
-    await this.userService.updateConfirmationStatus(user, true);
+    await this.userService.updateConfirmationStatus(user.id, true);
 
     const tokens = await this.tokenService.getTokens(
       this.generateUserTokenData(user)
     );
-    await this.updateRefreshToken(user.id, tokens.refreshToken);
+
+    await this.refreshSessionService.createRefreshSession({
+      refreshToken: tokens.refreshToken,
+      userId: user.id,
+      fingerprint,
+    });
     return tokens;
   }
 
