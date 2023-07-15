@@ -49,7 +49,7 @@ export class AuthService {
     await this.sendVerificationEmail(newUser, token);
   }
 
-  async signIn(data: AuthDto, fingerprint: string) {
+  async signIn({ fingerprint, ...data }: AuthDto) {
     if (!fingerprint)
       throw new BadRequestException(exceptionAuthMessages.NO_FINGERPRINT);
 

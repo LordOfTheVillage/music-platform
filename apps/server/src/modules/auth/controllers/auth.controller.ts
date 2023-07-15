@@ -11,16 +11,13 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  signup(@Body() createUserDto: CreateUserDto) {
+  signUp(@Body() createUserDto: CreateUserDto) {
     return this.authService.signUp(createUserDto);
   }
 
   @Post('login')
-  async signin(
-    @Body() { fingerprint, ...data }: AuthDto & any,
-    @Res() res: Response
-  ) {
-    const result = await this.authService.signIn(data, fingerprint);
+  async signIn(@Body() data: AuthDto, @Res() res: Response) {
+    const result = await this.authService.signIn(data);
     setRefreshTokenCookie(res, result.refreshToken);
     return result;
   }
